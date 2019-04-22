@@ -1,11 +1,10 @@
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
-// var cookieParser = require('cookie-parser');
-// var logger = require('morgan');
+var methodOverride = require('method-override');
 var bodyParser = require('body-parser');
 var mongoose = require('mongoose');
-
+var expressSanitizer = require('express-sanitizer');
 
 var app = express();
 
@@ -18,10 +17,11 @@ mongoose.connect("mongodb://localhost/restful_blog_app", {useNewUrlParser: true}
 
 // app.use(logger('dev'));
 app.use(express.json());
-app.use(express.urlencoded({ extended: false}));
-// app.use(cookieParser());
+app.use(express.urlencoded({extended: true}));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.urlencoded({extended: true}));
+app.use(expressSanitizer());
+app.use(methodOverride("_method"));
 
 
 // Mongoose/model Schema
@@ -35,14 +35,12 @@ var blogSchema = new mongoose.Schema({
 var Blog = mongoose.model("Blog", blogSchema);
 
 // Blog.create({
-// //   title: "Test Dog",
-// //   image: "https://mm.aiircdn.com/5/582c28329b60b.jpg",
-// //   body: "This is Kirk!"
-// // });
+//   title: "Test Dog",
+//   image: "https://mm.aiircdn.com/5/582c28329b60b.jpg",
+//   body: "This is Kirk!"
+// });
 
 // RESTFUL ROUTES
-// RESTFUL ROUTES
-
 app.get("/", function(req, res){
   res.redirect("/blogs");
 });
@@ -66,10 +64,8 @@ app.get("/blogs/new", function(req, res){
 // CREATE ROUTE
 app.post("/blogs", function(req, res){
   // create blog
-  console.log(req.body);
-  console.log("===========");
-  // console.log(req.body);
-  Blog.create(req.body, function(err, newBlog){
+  req.body.blog.body = req.sanitize(req.body.blog.body);
+  Blog.create(req.body.blog, function(err, newBlog){
     if(err){
       res.render("new");
     } else {
@@ -79,6 +75,54 @@ app.post("/blogs", function(req, res){
   });
 });
 
+
+// Show Route
+app.get("/blogs/:id", function (req, res) {
+    Blog.findById(req.params.id, function (err, foundBlog) {
+      if (err) {
+        res.redirect("/blogs");
+      } else {
+        res.render("show", {blog: foundBlog});
+      }
+    });
+});
+
+
+// EDIT ROUTE
+app.get("/blogs/:id/edit", function(req, res) {
+  Blog.findById(req.params.id, function (err, foundBlog) {
+    if (err) {
+      res.redirect("/blogs");
+    } else {
+      res.render("edit", {blog: foundBlog});
+    }
+  });
+});
+
+
+// UPDATE ROUTE
+app.put("/blogs/:id", function(req, res) {
+    req.body.blog.body = req.sanitize(req.body.blog.body);
+    Blog.findByIdAndUpdate(req.params.id, req.body.blog, function(err, updatedBlog) {
+      if (err) {
+          res.redirect("/blogs");
+      } else {
+        res.redirect("/blogs/" + req.params.id);
+      }
+    });
+});
+
+// DELETE ROUTE
+app.delete("/blogs/:id", function (req, res) {
+    Blog.findByIdAndRemove(req.params.id, function (err) {
+        if (err) {
+          res.redirect("/blogs");
+        } else {
+          res.redirect("/blogs");
+        }
+
+    });
+});
 
 app.listen(process.env.PORT, process.env.IP, function() {
   console.log("The YelpCamp App has been launched!");
